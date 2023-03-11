@@ -29,7 +29,7 @@ class Robot:
         self.rightWheelVel = rightWheel
     
     def move(self):
-        self.timeConstant = 0.5
+        self.timeConstant = 1
         # self.leftWheelVel += self.leftWheelAccel
         # self.rightWheelVel += self.rightWheelAccel
         # if (self.leftWheelVel > self.maxVel):
@@ -186,24 +186,25 @@ class Robot:
             # print("This is the saved angle: " + str(savedAngle))
             # print("This is the robot measure: " + str(self.degrees))
             if (savedAngle - self.degrees > 180): #turning left needed
-                side = 1
+                side = -1
             else: 
                 side = -1
         else:
             newAngle = self.degrees - savedAngle
             if (self.degrees - savedAngle > 180):
-                side = -1
+                side = 1
             else:  
                 side = 1
-        print("New Angle" + str(newAngle * side))
+        newAngle = self.calculateAnglularError(P0)
+        # print("New Angle" + str(newAngle * side))
         # print(newAngle)
         # if (side < 1):
         #     print("right")
         # else: 
         #     print("left")
         xVal = math.sin(math.pi / 180 * newAngle) * self.lookAheadDistance 
-        curvature = 2 * xVal / self.lookAheadDistance ** 2
-        return curvature * side
+        curvature = 2 * xVal / self.lookAheadDistance ** 2 * side
+        return curvature
 
     # def calculateCurvature2(self, P0):
     #     savedAngle = math.atan((P0.y - self.y)/(P0.x - self.x))
@@ -214,30 +215,39 @@ class Robot:
     #     return 2 * d  / self.lookAheadDistance ** 2
 
     def calculateAnglularError(self, P0):
-        degrees = self.degrees  
+        degrees = self.degrees 
+        newAngle = 0 
         if (P0.x > self.x):
-            if (P0.y > self.y):
-                savedAngle = 270 - 180 / math.pi * math.atan(abs(P0.y - self.y) / abs(P0.x  - self.x))
-            else:
+            if (P0.y > self.y): #Quadrant 4
                 savedAngle = 270 + 180 / math.pi * math.atan(abs(P0.y - self.y) / abs(P0.x  - self.x))
+                newAngle = savedAngle - self.degrees
+                if (newAngle > 180):
+                    newAngle -= 360
+            else: #Quadrant 1 
+                savedAngle = 270 - 180 / math.pi * math.atan(abs(P0.y - self.y) / abs(P0.x  - self.x))
+                newAngle = savedAngle - self.degrees
+                if (newAngle > 180):
+                    newAngle -= 360
         else:
-            if (P0.y > self.y):
-                savedAngle = 90 + 180 / math.pi * math.atan(abs(P0.y - self.y) / abs(P0.x  - self.x))
-            else:
+            if (P0.y > self.y): #Quadrant 3 
                 savedAngle = 90 - 180 / math.pi * math.atan(abs(P0.y - self.y) / abs(P0.x  - self.x))
-        savedAngle -= degrees
-        if savedAngle > 180:
-            savedAngle = -360 + savedAngle
-        elif (savedAngle < -180):
-            savedAngle = 360 + savedAngle
-        print(savedAngle)
-        return savedAngle
+                newAngle = savedAngle - self.degrees
+                if (newAngle < -180):
+                    newAngle += 360
+            else:
+                savedAngle = 90 + 180 / math.pi * math.atan(abs(P0.y - self.y) / abs(P0.x  - self.x))
+                newAngle = savedAngle - self.degrees
+                if (newAngle < -180):
+                    newAngle += 360
+        print("New angle is: " + str(newAngle))
+
+        return newAngle
 
 
     def basicPurePursuit(self, lookAheadDistance):
         self.lookAheadDistance = lookAheadDistance
         P0 = self.findNextPoint(lookAheadDistance)
-        kA = 0.05
+        kA = 0.4
         kV = 2
         translationalVelocity = kV * self.lookAheadDistance
         angularVelocity = self.calculateAnglularError(P0) * kA
@@ -249,7 +259,7 @@ class Robot:
         P0 = self.findNextPoint(lookAheadDistance)
         pointCurvature = self.bezierCurve.curvatureAtPoint(self.lastPos / 10000)
         # print("Point Curvature: " + str(self.calculateCurvature(P0)))
-        P0.setVel(min(P0.vel, 2 / pointCurvature))
+        P0.setVel(min(P0.vel, 4 / pointCurvature))
 
         kV = 1 / (self.maxVel)
         kA = 0.002
@@ -270,13 +280,13 @@ class Robot:
         if (self.leftTargetAccel < -self.maxAccel):
             self.leftTargetAccel = -self.maxAccel
         
-        # self.FFL = kV * self.leftTargetVel + kA * self.leftTargetAccel
-        # self.FBL = kP * (self.leftTargetVel - self.leftWheelVel)
-        # self.FFR = kV * self.rightTargetVel + kA * self.rightTargetAccel
-        # self.FBR = kP * (self.rightTargetVel - self.rightWheelVel)
+        self.FFL = kV * self.leftTargetVel + kA * self.leftTargetAccel
+        self.FBL = kP * (self.leftTargetVel - self.leftWheelVel)
+        self.FFR = kV * self.rightTargetVel + kA * self.rightTargetAccel
+        self.FBR = kP * (self.rightTargetVel - self.rightWheelVel)
         
-        self.FFL = kV * self.leftTargetVel
-        self.FFR = kV * self.rightTargetVel
+        # self.FFL = kV * self.leftTargetVel
+        # self.FFR = kV * self.rightTargetVel
 
         # print("VALSL:" + str(self.leftTargetVel) + ", " + str(self.leftTargetAccel) + " , " + str(self.leftTargetVel - self.leftWheelVel))
         # print("VALSR:" + str(self.rightTargetVel) + ", " + str(self.rightTargetAccel) + ", " + str(self.rightTargetVel - self.rightWheelVel))
@@ -289,8 +299,8 @@ class Robot:
         # print(np.linalg.norm(np.array(self.savedPathPoints[self.lastPos].tupleForm()) - np.array((self.x, self.y))))
         # print("leftSide" + str(self.FFL + self.FBL))
         # print("rightSide" + str(self.FFR + self.FBR))
-        # self.setVel(self.FFL + self.FBL, self.FFR + self.FBR)
-        self.setVel(self.FFL, self.FFR)
+        self.setVel(self.FFL + self.FBL, self.FFR + self.FBR)
+        # self.setVel(self.FFL, self.FFR)
         self.move()
 
     def draw(self, map):
